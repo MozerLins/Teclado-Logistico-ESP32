@@ -3,7 +3,7 @@
 //opcao = 0 - Confirmação 1 - Apresenta Mensagem
 //tipo = S - Sucesso(Azul) W -Warning(Amarelo)  D -Danger(Vermelho)
 //titulo = Titludo a ser Apresentado
-//mensagem = Texto a ser apresentado
+//mensagem = Texto a ser apresentado até 18 caracters
 char temp_mensagem[18];
 char temp_titulo[18];
 
@@ -41,30 +41,34 @@ bool Alert(int opcao, uint16_t tipo, char* titulo ,  char* mensagem)
     while (true) {
       update_button_list(confirm_buttons);
       if (btn_ok.justPressed()) {
-        Beep(5);
+
         delay(50);
         return true;
-        break;
       }
       if (btn_cancel.justPressed()) {
-        Beep(5);
+
         delay(50);
         return false;
-        break;
       }
     }
-  } else {
+  }
+  else if (opcao == 1) {
     btn_ok.initButton(&tft,  120, 210, 92, 40, tipo, WHITE, BLACK, "OK", 2);
     btn_ok.drawButton(false);
 
     while (true) {
       update_button_list(alert_buttons);
       if (btn_ok.justPressed()) {
-        Beep(5);
+
         delay(50);
         return true;
-        break;
       }
+    }
+  }
+  else if (opcao == 2) {
+    while (true) {
+        delay(8000);
+        return true;
     }
   }
 }

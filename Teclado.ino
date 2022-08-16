@@ -5,7 +5,8 @@ MCUFRIEND_kbv tft;
 #include <TouchScreen.h>
 #include "splashart.h" // Carrega Logo
 
-//Configurações Iniciais
+
+//---------------------------Configurações Iniciais-----------------------------------//
 const int coords[] = {600, 3800, 3800, 700};           // portrait - left, right, top, bottom
 const int rotation = 0;                               // Modo Retrato : rotation order - portrait, landscape, etc
 const int XP = 27, XM = 15, YP = 4, YM = 14;         // Pino Padraão ESP32 Uno touchscreen pins
@@ -13,10 +14,9 @@ int item = 0;                                       // Define Menu Inicial
 TouchScreen ts = TouchScreen(XP, YP, XM, YM, 300); // Define TouchScreen como TS e Define As Pinasgens Do Touch
 uint16_t pixel_x, pixel_y;                        //Variaveis de Coordenadas X / Y
 const int bpon = 1;                              //Variavel para ligar ou desligar o Beep
-char* received;
+String received;
 
-//---------------Configiração Bluetooh-------------------//
-
+//----------------------------Configiração Bluetooh---------------------------------//
 #if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
 #error Bluetooth is not enabled! Please run `make menuconfig` to and enable it
 #endif
@@ -26,24 +26,25 @@ BluetoothSerial SerialBT;     // Atribui objeto SerialBT
 const char *pin = "0000";    // Chave padrão do VL8
 bool connected;      // Guarda o estado da conexao buletooth
 String name;               // Guarda o nome do Bluetooh
-//--------------Ajuste de Pressão Na Tela----------------//
 
+//----------------------------Ajuste de Pressão Na Tela---------------------------//
 #define MINPRESSURE 200
 #define MAXPRESSURE 1000
-//-------------------Cores Utilizadas-------------------//
 
+//-------------------Cores Utilizadas-------------------//
 #define BLACK   0x0000
 #define WHITE   0xFFFF
 #define BLUE_MENU   0x11CD
 #define S 0x11CD // AZUL SUCESSO
 #define W 0xD5C1 // AMARELO WARNING
 #define D 0xD041 // VERMELHO DANGER
+
 //-------------------Criar Botões-----------------------//
 Adafruit_GFX_Button btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10, btn11, btn12,
                     btn13, btn14, btn15, btn16, btn17, btn18, btn19, btn20, btn21, btn22, btn23,
                     btn24, btn25, btn26, btn27, btn28, btn29, btn30, btnvoltar, btnprincipal,
                     num_1, num_2, num_3, num_4, num_5, num_6, num_7, num_8, num_9, num_0, num_del, num_enter,
-                    btn_ok, btn_cancel;
+                    btn_ok, btn_cancel, btn_option1, btn_option2;
 
 //-------------------Array De Botões-----------------------//
 Adafruit_GFX_Button *buttons[] = {&btnprincipal, &btn1, &btn2, &btn3, &btn4, &btn5, &btn6, NULL};
@@ -55,12 +56,7 @@ Adafruit_GFX_Button *buttons3[] = {&btnprincipal, &btn25, &btn26, NULL};
 Adafruit_GFX_Button *numbers[] = {&btnprincipal, &num_1, &num_2, &num_3, &num_4, &num_5, &num_6, &num_7, &num_8, &num_9, &num_0, &num_del, &num_enter, NULL}; // Teclado Numerico
 Adafruit_GFX_Button *confirm_buttons[] = {&btnprincipal, &btn_ok, &btn_cancel, NULL};
 Adafruit_GFX_Button *alert_buttons[] = {&btnprincipal, &btn_ok, NULL};
-//-------------------Função dos Menus-----------------------//
-//extern void menu(); // Principal
-//extern void menu1(); // Menu Operação
-//extern void menu2();
-//extern void menu3();
-//-----------Função para Confirmação de Telas---------------//
+Adafruit_GFX_Button *options[] = {&btn_option1, &btn_option2, NULL};
 
 //-------------Função para Beep do Teclado------------------//
 void Beep(int timer) {
@@ -113,10 +109,15 @@ bool Touch_getXY(void) {
 bool update_button(Adafruit_GFX_Button * b, bool pressed)
 {
   b->press(pressed && b->contains(pixel_x, pixel_y));
-  if (b->justReleased())
+  if (b->justReleased()) {
     b->drawButton(false);
-  if (b->justPressed())
+    delay(100);
+  }
+  if (b->justPressed()) {
+    Beep(5);
     b->drawButton(true);
+
+  }
   return pressed;
 }
 
@@ -152,15 +153,8 @@ void idDisplay() {
 
 void setup(void) {
   Serial.begin(115200);
-  // Beep(5);
-  idDisplay(); //IDDisplay
-  // name = "";
-  //SerialBT.register_callback(callback);  // Função de desconexão
-  //SerialBT.setPin();                 // Seta o pin do VL8 para conexão Padrão 0000
 
-  // SerialBT.enableSSP();
-  //SerialBT.begin("GW Terminal", true); // Define o nome do Bluetooh do teclado
-  // conectaBT();                        // Faz a primeira conexão com o bluetooh
+  idDisplay(); //IDDisplay
 
   //-------------------Orientação da Tela--------------------//
   String orientation;
@@ -179,17 +173,69 @@ void setup(void) {
       break;
   }
   //--------------------------------------------------------//
-  idDisplay();
   tft.setRotation(rotation);  // Define a Orientação
   Splash(BLACK, 200, 144, 1, BLACK); // Cores, resolução w x h / Para Alteração da imagem de splash deve-se Carregar na variavel global splashart a sequencia de binarios
+  // name = "";
+  //SerialBT.register_callback(callback);  // Função de desconexão
+  SerialBT.setPin("0000");                 // Seta o pin do VL8 para conexão Padrão 0000
+  SerialBT.begin("GW Terminal", true); // Define o nome do Bluetooh do teclado
+  conectaBT();                        // Faz a primeira conexão com o bluetooh
+  tft.fillScreen(BLACK);
   menu(false);
   btnprincipal.initButton(&tft,  20, 341, 30, 20, WHITE, WHITE, BLACK, "", 1);
   btnprincipal.drawButton(false);
+  //tft.setFont(&FreeSans9pt7b);
+  xTaskCreate(KeepAlive,
+              "KeepAlive",
+              1024,
+              NULL,
+              3,
+              NULL);
+
+  xTaskCreate(ReadSerial,
+              "ReadSerial",
+              1024,
+              NULL,
+              1,
+              NULL);
+}
+
+void KeepAlive(void *arg) {
+  for (;;) {
+    if (connected)
+    {
+      SerialBT.print("SSH001");                 // Keep Alive
+      delay(1000);
+      if (SerialBT.available()) {
+        received =  SerialBT.readString();
+        int posicao = received.indexOf(';');
+        if (posicao >= 0) {
+          received = received.substring(0, posicao);
+          Serial.println(received);
+        }
+
+        received = "";
+
+
+      } else {
+        conectaBT();
+      }
+    }
+    vTaskDelay(15000);
+  }
+}
+
+void ReadSerial(void *arg) {
+  for (;;) {
+    Serial.println("Lendo...");
+    if (SerialBT.available()) {
+      Serial.println(SerialBT.readString());
+    }
+    vTaskDelay(1000);
+  }
 }
 
 void loop() {
-
-  
   if (btnprincipal.justPressed()) {
     tft.fillScreen(BLACK);
     item = 0;
@@ -200,25 +246,30 @@ void loop() {
     update_button_list(buttons);
 
     if (btn1.justPressed()) {
-      Beep(5);
+      //Beep(5);
       delay(50);
-      KeyboardNum("Digite o CPF", 11);
-      KeyboardNum("Digite a Linha", 14);
-      KeyboardNum("Digite o Tel", 11);
-      bool confirma = Alert(0, W, "ATENCAO", "Iniciar Operacao ?");
-      tft.fillScreen(BLACK);
-      if (confirma == true) {
-        Alert(1, S, "SUCESSO" , "Operacao Iniciada");
-        Beep(100); delay(200); Beep(100);
-        tft.fillScreen(BLACK);
-        menu(false);
-      } else {
-        menu(false);
+      if (strcmp(KeyboardNum("Digite o CPF", 11), "\0") != 0) {
+        if (strcmp(KeyboardNum("Digite a Linha", 14), "\0") != 0) {
+          if (strcmp(KeyboardNum("Digite o Tel", 11), "\0") != 0) {
+            bool confirma = Alert(0, W, "ATENCAO", "Iniciar Operacao ?");
+            tft.fillScreen(BLACK);
+            if (confirma == true) {
+              Alert(1, S, "SUCESSO" , "Operacao Iniciada");
+              Beep(100); delay(200); Beep(100);
+              tft.fillScreen(BLACK);
+              menu(false);
+            } else {
+              menu(false);
+            }
+          }
+        }
       }
     }
 
+
+
     if (btn2.justPressed()) {
-      Beep(5);
+
       delay(50);
       bool confirma = Alert(0, W, "ATENCAO" , "Reiniciar Operacao");
       tft.fillScreen(BLACK);
@@ -233,22 +284,29 @@ void loop() {
 
     }
     if (btn3.justPressed()) {
-      Beep(5);
+
       delay(50);
     }
     if (btn4.justPressed()) {
-      Beep(5);
+
       delay(50);
 
     }
     if (btn5.justPressed()) { // Parada
-      Beep(5);
+
       //delay(50);
-      received = KeyboardNum("Informe a Senha", 6);
-      Serial.println(received);
+      if (strcmp(KeyboardNum("Informe a Senha", 6), "222222") == 0) {
+        Alert(1, S, "SUCESSO" , "Motivo da Parada");
+        tft.fillScreen(BLACK);
+        menu1(false);
+        item = 1;
+      } else if (strcmp(KeyboardNum("Informe a Senha", 6), "222222") != 0 and strcmp(KeyboardNum("Informe a Senha", 6),  "\0") != 0 ) {
+        Alert(1, S, "ERRO" , "Senha Incorreta");
+        menu(false);
+      }
     }
     if (btn6.justPressed()) {
-      Beep(5);
+
       delay(50);
       tft.fillScreen(BLACK);
       menu(true);
@@ -256,7 +314,7 @@ void loop() {
       while (true) {
         update_button_list(buttonsex);
         if (btn7.justPressed()) {
-          Beep(5);
+
           delay(50);
           bool confirma = Alert(0, W, "ATENCAO", "Finalizar Operacao ?");
           tft.fillScreen(BLACK);
@@ -271,7 +329,7 @@ void loop() {
           }
         }
         if (btn8.justPressed()) {
-          Beep(5);
+
           delay(50);
           tft.fillScreen(BLACK);
           item = 2;
@@ -281,17 +339,17 @@ void loop() {
 
         }
         if (btn9.justPressed()) {
-          Beep(5);
+
           delay(50);
         }
         if (btnprincipal.justPressed()) {
-          Beep(5);
+
           delay(50);
           tft.fillScreen(BLACK);
           break;
         }
         if (btnvoltar.justPressed()) {
-          Beep(5);
+
           delay(50);
           tft.fillScreen(BLACK);
           menu(false);
@@ -301,15 +359,26 @@ void loop() {
     }
   }
 
-  if (item == 1) {
+  if (item == 1) { //Menu Paradas
     update_button_list(buttons1);
 
     if (btn10.justPressed()) { // Cliente
-      Beep(5);
-      delay(50);
+      int opcao = Options(W, "ATENCAO", "Parada Cliente");
+      if (Alert(0, W, "ATENCAO", "Confirmar Operação") == true) {
+        if (Alert(1, W, "PORTA DO CARONA", "Abra a Porta:Carona") == true) {
+          if (Alert(1, W, "PORTA ABERTA", "Aperte OK") == true) {
+            if (Alert(1, W, "DESTRAVAR BAU", " Aperte Ok") == true) {
+              if (Alert(0, W, "DESTRAVAR BAU", "Confirmar Operação") == true) {
+
+              }
+            }
+          }
+        }
+      }
     }
+
     if (btn11.justPressed()) { // Refeicao
-      Beep(5);
+
       delay(50);
       bool confirma = Alert(0, W, "ATENCAO", "Confirmar Parada ?");
       tft.fillScreen(BLACK);
@@ -326,7 +395,7 @@ void loop() {
 
     }
     if (btn12.justPressed()) { // Acidente
-      Beep(5);
+
       delay(50);
       bool confirma = Alert(0, W, "ATENCAO", "Confirmar Parada ?");
       tft.fillScreen(BLACK);
@@ -343,7 +412,7 @@ void loop() {
 
     }
     if (btn13.justPressed()) { // Mecanico
-      Beep(5);
+
       delay(50);
       bool confirma = Alert(0, W, "ATENCAO", "Confirmar Parada ?");
       tft.fillScreen(BLACK);
@@ -360,7 +429,7 @@ void loop() {
 
     }
     if (btn14.justPressed()) {  // Policia
-      Beep(5);
+
       delay(50);
       bool confirma = Alert(0, W, "ATENCAO", "Confirmar Parada ?");
       tft.fillScreen(BLACK);
@@ -377,7 +446,7 @@ void loop() {
 
     }
     if (btn15.justPressed()) { //Mais Opções
-      Beep(5);
+
       delay(50);
       tft.fillScreen(BLACK);
       menu1(true);
@@ -385,7 +454,7 @@ void loop() {
       while (true) {
         update_button_list(buttons1ex);
         if (btn16.justPressed()) { // Carga e Descarga
-          Beep(5);
+
           delay(50);
           bool confirma = Alert(0, W, "ATENCAO", "Confirmar Parada ?");
           tft.fillScreen(BLACK);
@@ -401,7 +470,7 @@ void loop() {
           }
         }
         if (btn17.justPressed()) { // Banheiro
-          Beep(5);
+
           delay(50);
           bool confirma = Alert(0, W, "ATENCAO", "Confirmar Parada ?");
           tft.fillScreen(BLACK);
@@ -417,7 +486,7 @@ void loop() {
           }
         }
         if (btn18.justPressed()) { // Combustivel
-          Beep(5);
+
           delay(50);
           bool confirma = Alert(0, W, "ATENCAO", "Confirmar Parada ?");
           tft.fillScreen(BLACK);
@@ -433,7 +502,7 @@ void loop() {
           }
         }
         if (btn19.justPressed()) { // Malote
-          Beep(5);
+
           delay(50);
           bool confirma = Alert(0, W, "ATENCAO", "Confirmar Parada ?");
           tft.fillScreen(BLACK);
@@ -449,13 +518,13 @@ void loop() {
           }
         }
         if (btnprincipal.justPressed()) {
-          Beep(5);
+
           delay(50);
           tft.fillScreen(BLACK);
           break;
         }
         if (btnvoltar.justPressed()) {
-          Beep(5);
+
           delay(50);
           tft.fillScreen(BLACK);
           menu1(false);
@@ -468,23 +537,23 @@ void loop() {
   if (item == 2) {
     update_button_list(buttons2);
     if (btn20.justPressed()) {
-      Beep(5);
+
       delay(50);
     }
     if (btn21.justPressed()) {
-      Beep(5);
+
       delay(50);
     }
     if (btn22.justPressed()) {
-      Beep(5);
+
       delay(50);
     }
     if (btn23.justPressed()) {
-      Beep(5);
+
       delay(50);
     }
     if (btn24.justPressed()) {
-      Beep(5);
+
       delay(50);
       tft.fillScreen(BLACK);
       item = 3;

@@ -1,5 +1,5 @@
 //------------------- Função para desconexão do Bluetooh-----------------------//
-void callback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param)
+/*void callback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param)
 {
   if (event == ESP_SPP_CLOSE_EVT)
   {
@@ -8,20 +8,23 @@ void callback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param)
     delay(1000);
     connected = true;
   }
-}
+}*/
 //-----------------------------------------------------------------------------//
 
 //----------- Estabelece Conexão com com VL8 através do bluetooth-------------//
 void conectaBT()
 {
+  //Alert(2, S, "AGUARDE" , "Conectando BT...");
   Serial.println("Conectando BT...");
-  connected = SerialBT.connect("DESKTOP-SJV2C2N");
+  connected = SerialBT.connect("VIRTEC_VL8_0102");
+  delay(10000);
   if (connected)
   {
-    delay(100);
-    Serial.println("Connected Succesfully!");
-    SerialBT.print("PFL,btcon");
-    Serial.println("Conectado");
+    //delay(100);
+    //Alert(2, S, "SUCESSO" , "Conectado");
+    //Serial.println("Connected Succesfully!");
+    //SerialBT.print("PFL,btcon");
+    //Serial.println("Conectado");
     Beep(5);
   }
   else
