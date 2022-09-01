@@ -1,14 +1,17 @@
 void c(char text[], char caracter) {
   size_t tamanho = strlen(text);
-  if (tamanho <= 13) {
+  if (tamanho) {
     text[tamanho] = caracter;
     text[tamanho + 1] = '\0';
   }
 }
 
-char* KeyboardNum(char* marker , int s) {
-  char *input = (char*)malloc(15);
+char* KeyboardNum(char* marker , int s , char* command) {
+  char *input = (char*)malloc(18);
   input[0] = '\0';
+  strcpy(input, command);
+  strcat (input, " ");
+
   bool notext = true;
   int a = 40;
   int b = 40;
@@ -52,6 +55,9 @@ char* KeyboardNum(char* marker , int s) {
       return "\0";
 
     }
+    if (Flag_Pause == 1) {
+      break;
+    }
 
     if (a < limit) {
       if (a == 40) {
@@ -70,118 +76,115 @@ char* KeyboardNum(char* marker , int s) {
         if (notext == true) {
           notext = false;
           tft.fillRect(a - 8, b, 176, 20, WHITE);
-          delay(50);
         }
         tft.print("1");
         a = a + 12;
         c(input, '1');
-        delay(50);
       }
       if (num_2.justPressed()) {
         if (notext == true) {
           notext = false;
           tft.fillRect(a - 8, b, 176, 20, WHITE);
-          delay(50);
         }
         tft.print("2");
         a = a + 12;
         c(input, '2');
-        delay(50);
+
       }
       if (num_3.justPressed()) {
         if (notext == true) {
           notext = false;
           tft.fillRect(a - 8, b, 176, 20, WHITE);
-          delay(50);
+
         }
         tft.print("3");
         a = a + 12;
         c(input, '3');
-        delay(50);
+
       }
       if (num_4.justPressed()) {
         if (notext == true) {
           notext = false;
           tft.fillRect(a - 8, b, 176, 20, WHITE);
-          delay(50);
+
         }
         tft.print("4");
         a = a + 12;
         c(input, '4');
-        delay(50);
+
       }
       if (num_5.justPressed()) {
         if (notext == true) {
           notext = false;
           tft.fillRect(a - 8, b, 176, 20, WHITE);
-          delay(50);
+
         }
         tft.print("5");
         a = a + 12;
         c(input, '5');
-        delay(50);
+
       }
       if (num_6.justPressed()) {
         if (notext == true) {
           notext = false;
           tft.fillRect(a - 8, b, 176, 20, WHITE);
-          delay(50);
+
         }
         tft.print("6");
         a = a + 12;
         c(input, '6');
-        delay(50);
+
       }
       if (num_7.justPressed()) {
         if (notext == true) {
           notext = false;
           tft.fillRect(a - 8, b, 176, 20, WHITE);
-          delay(50);
+
         }
         tft.print("7");
         a = a + 12;
         c(input, '7');
-        delay(50);
+
       }
       if (num_8.justPressed()) {
         if (notext == true) {
           notext = false;
           tft.fillRect(a - 8, b, 176, 20, WHITE);
-          delay(50);
+
         }
         tft.print("8");
         a = a + 12;
         c(input, '8');
-        delay(50);
+
       }
       if (num_9.justPressed()) {
         if (notext == true) {
           notext = false;
           tft.fillRect(a - 8, b, 176, 20, WHITE);
-          delay(50);
+
         }
         tft.print("9");
         a = a + 12;
         c(input, '9');
-        delay(50);
+
       }
       if (num_del.justPressed() and a > 40) {
         a = a - 12;
         tft.fillRect(a, b, 12, 20, WHITE);
         input[strlen(input) - 1] = '\0';
-        delay(50);
+
       }
 
       if (num_0.justPressed()) {
         if (notext == true) {
           notext = false;
           tft.fillRect(a - 8, b, 176, 20, WHITE);
-          delay(50);
+
         }
         tft.print("0");
         a = a + 12;
         c(input, '0');
-        delay(50);
+
       }
 
       if (num_enter.justPressed()) {
@@ -190,15 +193,15 @@ char* KeyboardNum(char* marker , int s) {
 
     } else {
       if (num_enter.justPressed()) {
-        tft.fillScreen(BLACK);
+        //tft.fillScreen(BLACK);
         return input;
-        
+
       }
       if (num_del.justPressed() and a > 40) {
         a = a - 12;
         tft.fillRect(a, b, 12, 20, WHITE);
         input[strlen(input) - 1] = '\0';
-        delay(50);
+
       }
     }
   }

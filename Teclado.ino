@@ -1,10 +1,9 @@
-//#include <Adafruit_GFX.h>         // Core graphics library
+//#include <Adafruit_GFX.h>            // Core graphics library (Não Utilizado)
 #include <BluetoothSerial.h>          // Biblioteca para o Bluetooh
 #include <MCUFRIEND_kbv.h>
 MCUFRIEND_kbv tft;
 #include <TouchScreen.h>
-#include "splashart.h" // Carrega Logo
-
+#include "splashart.h" // Carrega Logo (Splash Art)
 
 //---------------------------Configurações Iniciais-----------------------------------//
 const int coords[] = {600, 3800, 3800, 700};           // portrait - left, right, top, bottom
@@ -14,7 +13,34 @@ int item = 0;                                       // Define Menu Inicial
 TouchScreen ts = TouchScreen(XP, YP, XM, YM, 300); // Define TouchScreen como TS e Define As Pinasgens Do Touch
 uint16_t pixel_x, pixel_y;                        //Variaveis de Coordenadas X / Y
 const int bpon = 1;                              //Variavel para ligar ou desligar o Beep
-String received;
+String received;                                //Variavel para Salvar o Que Vem Da Serial BT
+String ACK ;
+char* menu_active;                             //Variavel para Identificação do Menu();
+
+//---------------------------Flags do Sistema(15 Flags Totais)---------------------------------//
+int Flag_Operacao = 0;
+int Flag_Parada = 0;
+int Flag_Carona = 0;
+int Flag_Area_Verificacao = 0;
+int Flag_ContraSenha = 0;
+int Flag_Bau = 0;
+int Flag_Ignicao = 0;
+int Flag_VerificacaoArea = 0;
+int Flag_Portas = 0;
+int Flag_OperacaoBloqueada = 0;
+int Flag_AreaMalote = 0;
+int Flag_Pause = 0;
+//int Flag_While = 0;
+//int Flag_15 = 0;
+
+//------------------------------Tarefeas do Sitesma----------------------------//
+TaskHandle_t xHandle;
+TaskHandle_t HandleKeep;
+TaskHandle_t HandleConnect;
+
+void KeepAlive(void *pvParameters);
+void ReadSerial(void *pvParameters);
+void Connect(void *pvParameters);
 
 //----------------------------Configiração Bluetooh---------------------------------//
 #if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
@@ -24,8 +50,8 @@ String received;
 //----------------------------Variaveis Globais Bluetooh---------------------------//
 BluetoothSerial SerialBT;     // Atribui objeto SerialBT
 const char *pin = "0000";    // Chave padrão do VL8
-bool connected;      // Guarda o estado da conexao buletooth
-String name;               // Guarda o nome do Bluetooh
+bool connected = false;      // Guarda o estado da conexao buletooth
+char* name;               // Guarda o nome do Bluetooh
 
 //----------------------------Ajuste de Pressão Na Tela---------------------------//
 #define MINPRESSURE 200
@@ -50,7 +76,7 @@ Adafruit_GFX_Button btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10,
 Adafruit_GFX_Button *buttons[] = {&btnprincipal, &btn1, &btn2, &btn3, &btn4, &btn5, &btn6, NULL};
 Adafruit_GFX_Button *buttonsex[] = {&btnprincipal, &btnvoltar, &btn7, &btn8, &btn9, NULL};
 Adafruit_GFX_Button *buttons1[] = {&btnprincipal, &btn10, &btn11, &btn12, &btn13, &btn14, &btn15, NULL};
-Adafruit_GFX_Button *buttons1ex[] = {&btnprincipal, &btnvoltar, &btn16, &btn17, &btn18, &btn18, &btn19, NULL};
+Adafruit_GFX_Button *buttons1ex[] = {&btnprincipal, &btnvoltar, &btn16, &btn17, &btn18, &btn19, NULL};
 Adafruit_GFX_Button *buttons2[] = {&btnprincipal, &btn20, &btn21, &btn22, &btn23, &btn24, NULL};
 Adafruit_GFX_Button *buttons3[] = {&btnprincipal, &btn25, &btn26, NULL};
 Adafruit_GFX_Button *numbers[] = {&btnprincipal, &num_1, &num_2, &num_3, &num_4, &num_5, &num_6, &num_7, &num_8, &num_9, &num_0, &num_del, &num_enter, NULL}; // Teclado Numerico
@@ -151,8 +177,16 @@ void idDisplay() {
   tft.begin(ID);
 }
 
+void FailCommand() {
+  if (!btnprincipal.justPressed()) {
+    Alert(1, D, "FALHA" , "ENVIO DE COMANDO", 0);
+    ReturnMenu(menu_active);
+  }
+}
+
 void setup(void) {
   Serial.begin(115200);
+  xTaskCreate(Connect, "Connect", 2048, NULL, 0, &HandleConnect);
 
   idDisplay(); //IDDisplay
 
@@ -176,393 +210,598 @@ void setup(void) {
   tft.setRotation(rotation);  // Define a Orientação
   Splash(BLACK, 200, 144, 1, BLACK); // Cores, resolução w x h / Para Alteração da imagem de splash deve-se Carregar na variavel global splashart a sequencia de binarios
   // name = "";
-  //SerialBT.register_callback(callback);  // Função de desconexão
-  SerialBT.setPin("0000");                 // Seta o pin do VL8 para conexão Padrão 0000
+  SerialBT.register_callback(callback);  // Função de desconexão
+  //SerialBT.setPin("0000");                 // Seta o pin do VL8 para conexão Padrão 0000
   SerialBT.begin("GW Terminal", true); // Define o nome do Bluetooh do teclado
-  conectaBT();                        // Faz a primeira conexão com o bluetooh
+  //  conectaBT();                        // Faz a primeira conexão com o bluetooh
   tft.fillScreen(BLACK);
-  menu(false);
+  menu_active = menu(false);
   btnprincipal.initButton(&tft,  20, 341, 30, 20, WHITE, WHITE, BLACK, "", 1);
   btnprincipal.drawButton(false);
-  //tft.setFont(&FreeSans9pt7b);
-  xTaskCreate(KeepAlive,
-              "KeepAlive",
-              1024,
-              NULL,
-              3,
-              NULL);
+  xTaskCreate(KeepAlive, "KeepAlive", 2048, NULL, 2, &HandleKeep);
+  xTaskCreate(ReadSerial, "ReadSerial", 2048, NULL, 1, &xHandle);
 
-  xTaskCreate(ReadSerial,
-              "ReadSerial",
-              1024,
-              NULL,
-              1,
-              NULL);
-}
-
-void KeepAlive(void *arg) {
-  for (;;) {
-    if (connected)
-    {
-      SerialBT.print("SSH001");                 // Keep Alive
-      delay(1000);
-      if (SerialBT.available()) {
-        received =  SerialBT.readString();
-        int posicao = received.indexOf(';');
-        if (posicao >= 0) {
-          received = received.substring(0, posicao);
-          Serial.println(received);
-        }
-
-        received = "";
-
-
-      } else {
-        conectaBT();
-      }
-    }
-    vTaskDelay(15000);
-  }
-}
-
-void ReadSerial(void *arg) {
-  for (;;) {
-    Serial.println("Lendo...");
-    if (SerialBT.available()) {
-      Serial.println(SerialBT.readString());
-    }
-    vTaskDelay(1000);
-  }
 }
 
 void loop() {
-  if (btnprincipal.justPressed()) {
-    tft.fillScreen(BLACK);
-    item = 0;
-    menu(false);
-  }
+  if (Flag_Pause == 0) {
+    if (Flag_OperacaoBloqueada == 0) {
+      if (btnprincipal.justPressed()) {
+        tft.fillScreen(BLACK);
+        item = 0;
+        menu_active = menu(false);
+      }
 
-  if (item == 0) {
-    update_button_list(buttons);
+      if (item == 0) {
+        update_button_list(buttons);
 
-    if (btn1.justPressed()) {
-      //Beep(5);
-      delay(50);
-      if (strcmp(KeyboardNum("Digite o CPF", 11), "\0") != 0) {
-        if (strcmp(KeyboardNum("Digite a Linha", 14), "\0") != 0) {
-          if (strcmp(KeyboardNum("Digite o Tel", 11), "\0") != 0) {
-            bool confirma = Alert(0, W, "ATENCAO", "Iniciar Operacao ?");
-            tft.fillScreen(BLACK);
-            if (confirma == true) {
-              Alert(1, S, "SUCESSO" , "Operacao Iniciada");
-              Beep(100); delay(200); Beep(100);
-              tft.fillScreen(BLACK);
-              menu(false);
+        if (btn1.justPressed()) {
+          if (Flag_Operacao == 0 and Flag_Portas == 0 and Flag_Ignicao == 1) {
+            SerialBT.print(KeyboardNum("Digite o CPF", 11, "STP05"));
+            if (connected == true) {
+              SerialBT.print(KeyboardNum("Digite a Linha", 14, "STP06"));
+              if (connected == true) {
+                SerialBT.print(KeyboardNum("Digite o Tel", 11, "STP07"));
+                if (connected == true) {
+                  bool confirma = Alert(0, W, "ATENCAO", "Iniciar Operacao ?", 0);
+                  tft.fillScreen(BLACK);
+                  if (confirma == true and connected == true) {
+                    SerialBT.print("SSH011");
+                    if (connected == true) {
+                      Alert(1, S, "SUCESSO" , "Operacao Iniciada", 0);
+                      Flag_Operacao = 1;
+                      Beep(100); delay(200); Beep(100);
+                      tft.fillScreen(BLACK);
+                      ReturnMenu(menu_active);
+                    } else {
+                      FailCommand();
+                    }
+                  } else {
+                    FailCommand();
+                  }
+                } else {
+                  FailCommand();
+                }
+              } else {
+                FailCommand();
+              }
             } else {
-              menu(false);
+              FailCommand();
+            }
+          } else if (Flag_Ignicao == 0) {
+            Alert(1, D, "IGNICAO" , "DESLIGADA", 0);
+            ReturnMenu(menu_active);
+          }
+        }
+
+        if (btn2.justPressed()) {
+          if (Flag_Operacao == 1 and Flag_Parada == 1 and Flag_Portas == 0 and Flag_Bau == 0 and Flag_Ignicao == 0) {
+            bool confirma = Alert(0, W, "ATENCAO" , "Reiniciar Operacao", 0);
+            tft.fillScreen(BLACK);
+
+            if (confirma == true) {
+              SerialBT.print("SSH021");
+              if (connected == true) {
+                Alert(1, S, "SUCESSO" , "Operacao Iniciada", 0);
+                Flag_Parada = 0;
+                tft.fillScreen(BLACK);
+                ReturnMenu(menu_active);
+              } else {
+                FailCommand();
+              }
+            } else {
+              ReturnMenu(menu_active);
             }
           }
         }
-      }
-    }
 
-
-
-    if (btn2.justPressed()) {
-
-      delay(50);
-      bool confirma = Alert(0, W, "ATENCAO" , "Reiniciar Operacao");
-      tft.fillScreen(BLACK);
-
-      if (confirma == true) {
-        Alert(1, S, "SUCESSO" , "Operacao Iniciada");
-        tft.fillScreen(BLACK);
-        menu(false);
-      } else {
-        menu(false);
-      }
-
-    }
-    if (btn3.justPressed()) {
-
-      delay(50);
-    }
-    if (btn4.justPressed()) {
-
-      delay(50);
-
-    }
-    if (btn5.justPressed()) { // Parada
-
-      //delay(50);
-      if (strcmp(KeyboardNum("Informe a Senha", 6), "222222") == 0) {
-        Alert(1, S, "SUCESSO" , "Motivo da Parada");
-        tft.fillScreen(BLACK);
-        menu1(false);
-        item = 1;
-      } else if (strcmp(KeyboardNum("Informe a Senha", 6), "222222") != 0 and strcmp(KeyboardNum("Informe a Senha", 6),  "\0") != 0 ) {
-        Alert(1, S, "ERRO" , "Senha Incorreta");
-        menu(false);
-      }
-    }
-    if (btn6.justPressed()) {
-
-      delay(50);
-      tft.fillScreen(BLACK);
-      menu(true);
-
-      while (true) {
-        update_button_list(buttonsex);
-        if (btn7.justPressed()) {
-
-          delay(50);
-          bool confirma = Alert(0, W, "ATENCAO", "Finalizar Operacao ?");
-          tft.fillScreen(BLACK);
-          if (confirma == true) {
-            Alert(1, S, "SUCESSO" , "Operacao Finalizada");
-            Beep(100); delay(200); Beep(100);
-            tft.fillScreen(BLACK);
-            menu(false);
-          } else {
-            tft.fillScreen(BLACK);
-            menu(false);
+        if (btn3.justPressed()) { // Apoio Operacional
+          SerialBT.print(KeyboardNum("Digite o Tel", 11, "STP07"));
+          if (!btnprincipal.justPressed()) {
+            bool confirma = Alert(0, W, "ATENCAO", "Realizar Apoio ?", 0);
+            if (confirma == true) {
+              SerialBT.print("SCT04 6");
+              if (connected == true) {
+                Alert(1, S, "SUCESSO" , "Apoio Realizado", 0);
+                ReturnMenu(menu_active);
+              } else {
+                FailCommand();
+              }
+            } else {
+              ReturnMenu(menu_active);
+            }
           }
         }
-        if (btn8.justPressed()) {
+        if (btn4.justPressed()) {
 
-          delay(50);
+        }
+
+        if (btn5.justPressed()) { // Parada
+          if (Flag_Operacao == 0 and Flag_Ignicao == 0) {
+            if (strcmp(KeyboardNum("Informe a Senha", 6, "STP05"), "STP05 222222") == 0) {
+              //if (connected == true) {
+              Alert(1, S, "SUCESSO" , "Escolha Motivo", 0);
+              tft.fillScreen(BLACK);
+              menu_active =  menu1(false);
+              item = 1;
+              //} else {
+              //  FailCommand();
+              //  }
+            } else {
+              Alert(1, S, "FALHA" , "Senha Incorreta", 0);
+              tft.fillScreen(BLACK);
+              ReturnMenu(menu_active);
+            }
+          }
+        }
+
+        if (btn6.justPressed()) {
           tft.fillScreen(BLACK);
-          item = 2;
-          menu2();
-          break;
+          menu_active = menu(true);
 
+          while (true) {
+            if (Flag_Pause == 1) {
+              break;
+            }
+            update_button_list(buttonsex);
 
-        }
-        if (btn9.justPressed()) {
-
-          delay(50);
-        }
-        if (btnprincipal.justPressed()) {
-
-          delay(50);
-          tft.fillScreen(BLACK);
-          break;
-        }
-        if (btnvoltar.justPressed()) {
-
-          delay(50);
-          tft.fillScreen(BLACK);
-          menu(false);
-          break;
-        }
-      }
-    }
-  }
-
-  if (item == 1) { //Menu Paradas
-    update_button_list(buttons1);
-
-    if (btn10.justPressed()) { // Cliente
-      int opcao = Options(W, "ATENCAO", "Parada Cliente");
-      if (Alert(0, W, "ATENCAO", "Confirmar Operação") == true) {
-        if (Alert(1, W, "PORTA DO CARONA", "Abra a Porta:Carona") == true) {
-          if (Alert(1, W, "PORTA ABERTA", "Aperte OK") == true) {
-            if (Alert(1, W, "DESTRAVAR BAU", " Aperte Ok") == true) {
-              if (Alert(0, W, "DESTRAVAR BAU", "Confirmar Operação") == true) {
-
+            if (btn7.justPressed()) { // Finalizar Operacao
+              if (Flag_Operacao == 1 and Flag_Ignicao == 0 and Flag_Portas == 0 and Flag_Parada) {
+                bool confirma = Alert(0, W, "ATENCAO", "Finalizar Operacao ?", 0);
+                tft.fillScreen(BLACK);
+                if (confirma == true) {
+                  SerialBT.print("SSH121");
+                  if (connected == true) {
+                    Alert(1, S, "SUCESSO" , "Operacao Finalizada", 0);
+                    Flag_Operacao = 0;
+                    Beep(100); delay(200); Beep(100);
+                    tft.fillScreen(BLACK);
+                    ReturnMenu(menu_active);
+                    break;
+                  } else {
+                    FailCommand();
+                    break;
+                  }
+                } else {
+                  tft.fillScreen(BLACK);
+                  ReturnMenu(menu_active);
+                  break;
+                }
               }
             }
+            if (btn8.justPressed()) { //Emergencia
+              tft.fillScreen(BLACK);
+              item = 2;
+              menu_active = menu2();
+              break;
+            }
+            if (btn9.justPressed()) { // Configuração
+            }
+            if (btnprincipal.justPressed()) {
+              tft.fillScreen(BLACK);
+              break;
+            }
+            if (btnvoltar.justPressed()) {
+              tft.fillScreen(BLACK);
+              ReturnMenu(menu_active);
+              break;
+            }
           }
         }
       }
-    }
 
-    if (btn11.justPressed()) { // Refeicao
+      if (item == 1) { //Menu Paradas
+        update_button_list(buttons1);
+        if (btn10.justPressed()) { // Cliente
+          int opcao = Options(W, "ATENCAO", "Parada Cliente");
+          if (opcao == 1) {
+            if (Alert(0, W, "ATENCAO", "Confirmar Operacao", 0) == true) {
+              SerialBT.print("SCT03 1");
+              if (connected == true) {
+                if (Alert(3, W, "PORTA DO CARONA", "Abra a Porta Carona", Flag_Carona) == true)  {
+                  if (Alert(2, W, "PORTA ABERTA", "Porta Carona Aberta", 0) == true) {
+                    if (Alert(1, W, "DESTRAVAR BAU", " Aperte Ok", 0) == true) {
+                      if (Alert(0, W, "DESTRAVAR BAU", "Confirmar Operação", 0) == true) {
+                        if (connected == true) {
+                          SerialBT.print("SSH091");
+                          Flag_Parada = 1;
+                        } else {
+                          FailCommand();
+                        }
+                      }
+                      else {
+                        ReturnMenu(menu_active);
+                      }
+                    }
+                  }
+                } else {
+                  ReturnMenu(menu_active);
+                }
+              } else {
+                FailCommand();
+              }
+            } else {
+              ReturnMenu(menu_active);
+            }
+          }
+          else if (opcao == 2) {
+            if (Alert(0, W, "ATENCAO", "Confirmar Operacao", 0) == true) {
+              SerialBT.print("SCT03 7");
+              if (connected == true) {
+                if (Alert(3, W, "PORTA DO CARONA", "Abra a Porta Carona", Flag_Carona) == true)  {
+                  if (Alert(2, W, "PORTA ABERTA", "Porta Carona Aberta", 0) == true) {
+                    if (Alert(1, W, "DESTRAVAR BAU", " Aperte Ok", 0) == true) {
+                      if (Alert(0, W, "DESTRAVAR BAU", "Confirmar Operação", 0) == true) {
+                        if (connected == true) {
+                          SerialBT.print("SSH091");
+                          Flag_Parada = 1;
+                        } else {
+                          FailCommand();
+                        }
+                      }
+                      else {
+                        ReturnMenu(menu_active);
+                      }
+                    }
+                  }
+                } else {
+                  ReturnMenu(menu_active);
+                }
+              } else {
+                FailCommand();
+              }
+            } else {
+              ReturnMenu(menu_active);
+            }
+          }
+        }
 
-      delay(50);
-      bool confirma = Alert(0, W, "ATENCAO", "Confirmar Parada ?");
-      tft.fillScreen(BLACK);
-      if (confirma == true) {
-        Alert(1, S, "SUCESSO" , "Parada Realizada");
-        Beep(100); delay(200); Beep(100);
-        tft.fillScreen(BLACK);
-        menu1(false);
-      } else {
-        tft.fillScreen(BLACK);
-        item = 0;
-        menu(false);
-      }
-
-    }
-    if (btn12.justPressed()) { // Acidente
-
-      delay(50);
-      bool confirma = Alert(0, W, "ATENCAO", "Confirmar Parada ?");
-      tft.fillScreen(BLACK);
-      if (confirma == true) {
-        Alert(1, S, "SUCESSO" , "Parada Realizada");
-        Beep(100); delay(200); Beep(100);
-        tft.fillScreen(BLACK);
-        menu1(false);
-      } else {
-        tft.fillScreen(BLACK);
-        item = 0;
-        menu(false);
-      }
-
-    }
-    if (btn13.justPressed()) { // Mecanico
-
-      delay(50);
-      bool confirma = Alert(0, W, "ATENCAO", "Confirmar Parada ?");
-      tft.fillScreen(BLACK);
-      if (confirma == true) {
-        Alert(1, S, "SUCESSO" , "Parada Realizada");
-        Beep(100); delay(200); Beep(100);
-        tft.fillScreen(BLACK);
-        menu1(false);
-      } else {
-        tft.fillScreen(BLACK);
-        item = 0;
-        menu(false);
-      }
-
-    }
-    if (btn14.justPressed()) {  // Policia
-
-      delay(50);
-      bool confirma = Alert(0, W, "ATENCAO", "Confirmar Parada ?");
-      tft.fillScreen(BLACK);
-      if (confirma == true) {
-        Alert(1, S, "SUCESSO" , "Parada Realizada");
-        Beep(100); delay(200); Beep(100);
-        tft.fillScreen(BLACK);
-        menu1(false);
-      } else {
-        tft.fillScreen(BLACK);
-        item = 0;
-        menu(false);
-      }
-
-    }
-    if (btn15.justPressed()) { //Mais Opções
-
-      delay(50);
-      tft.fillScreen(BLACK);
-      menu1(true);
-
-      while (true) {
-        update_button_list(buttons1ex);
-        if (btn16.justPressed()) { // Carga e Descarga
-
-          delay(50);
-          bool confirma = Alert(0, W, "ATENCAO", "Confirmar Parada ?");
+        if (btn11.justPressed()) { // Refeicao
+          bool confirma = Alert(0, W, "ATENCAO", "Confirmar Parada ?", 0);
           tft.fillScreen(BLACK);
           if (confirma == true) {
-            Alert(1, S, "SUCESSO" , "Parada Realizada");
-            Beep(100); delay(200); Beep(100);
-            tft.fillScreen(BLACK);
-            menu1(false);
+            SerialBT.print("SCT03 2");
+            if (connected == true) {
+              Alert(1, S, "SUCESSO" , "Parada Realizada", 0);
+              Flag_Parada = 1;
+              Beep(100); delay(200); Beep(100);
+              tft.fillScreen(BLACK);
+              menu_active = menu1(false);
+            } else {
+              FailCommand();
+            }
           } else {
-            tft.fillScreen(BLACK);
-            item = 0;
-            menu(false);
+            ReturnMenu(menu_active);
           }
-        }
-        if (btn17.justPressed()) { // Banheiro
 
-          delay(50);
-          bool confirma = Alert(0, W, "ATENCAO", "Confirmar Parada ?");
+        }
+        if (btn12.justPressed()) { // Acidente
+          bool confirma = Alert(0, W, "ATENCAO", "Confirmar Parada ?", 0);
           tft.fillScreen(BLACK);
           if (confirma == true) {
-            Alert(1, S, "SUCESSO" , "Parada Realizada");
-            Beep(100); delay(200); Beep(100);
-            tft.fillScreen(BLACK);
-            menu1(false);
+            SerialBT.print("SCT03 3");
+            if (connected == true) {
+              Alert(1, S, "SUCESSO" , "Parada Realizada", 0);
+              Flag_Parada = 1;
+              Beep(100); delay(200); Beep(100);
+              tft.fillScreen(BLACK);
+              menu_active = menu1(false);
+            } else {
+              FailCommand();
+            }
           } else {
-            tft.fillScreen(BLACK);
-            item = 0;
-            menu(false);
+            ReturnMenu(menu_active);
           }
-        }
-        if (btn18.justPressed()) { // Combustivel
 
-          delay(50);
-          bool confirma = Alert(0, W, "ATENCAO", "Confirmar Parada ?");
+        }
+
+        if (btn13.justPressed()) { // Mecanico
+          bool confirma = Alert(0, W, "ATENCAO", "Confirmar Parada ?", 0);
           tft.fillScreen(BLACK);
           if (confirma == true) {
-            Alert(1, S, "SUCESSO" , "Parada Realizada");
-            Beep(100); delay(200); Beep(100);
-            tft.fillScreen(BLACK);
-            menu1(false);
+            SerialBT.print("SCT03 4");
+            if (connected == true) {
+              Alert(1, S, "SUCESSO" , "Parada Realizada", 0);
+              Flag_Parada = 1;
+              Beep(100); delay(200); Beep(100);
+              tft.fillScreen(BLACK);
+              menu_active = menu1(false);
+            } else {
+              FailCommand();
+            }
           } else {
-            tft.fillScreen(BLACK);
-            item = 0;
-            menu(false);
+            ReturnMenu(menu_active);
           }
         }
-        if (btn19.justPressed()) { // Malote
 
-          delay(50);
-          bool confirma = Alert(0, W, "ATENCAO", "Confirmar Parada ?");
-          tft.fillScreen(BLACK);
-          if (confirma == true) {
-            Alert(1, S, "SUCESSO" , "Parada Realizada");
-            Beep(100); delay(200); Beep(100);
-            tft.fillScreen(BLACK);
-            menu1(false);
+        if (btn14.justPressed()) {  // Policia  // Voltar Aqui
+          if (Alert(0, W, "ATENCAO", "Confirmar Operacao", 0) == true) {
+            if (connected == true) {
+              SerialBT.print("SCT03 5");
+              if (Alert(3, W, "PORTA DO CARONA", "Abra a Porta Carona", Flag_Carona) == true)  {
+                if (Alert(2, W, "PORTA ABERTA", "Porta Carona Aberta", 0) == true) {
+                  if (Alert(1, W, "DESTRAVAR BAU", " Aperte Ok", 0) == true) {
+                    if (Alert(0, W, "DESTRAVAR BAU", "Confirmar Operação", 0) == true) {
+                      if (connected == true) {
+                        SerialBT.print("SSH091");
+                        Flag_Parada = 1;
+                      } else {
+                        FailCommand();
+                      }
+                    }
+                    else {
+                      ReturnMenu(menu_active);
+                    }
+                  }
+                }
+              } else {
+                ReturnMenu(menu_active);
+              }
+            } else {
+              FailCommand();
+            }
           } else {
-            tft.fillScreen(BLACK);
-            item = 0;
-            menu(false);
+            ReturnMenu(menu_active);
           }
         }
-        if (btnprincipal.justPressed()) {
-
-          delay(50);
+        if (btn15.justPressed()) { //Mais Opções
           tft.fillScreen(BLACK);
-          break;
-        }
-        if (btnvoltar.justPressed()) {
+          menu1(true);
 
-          delay(50);
+          while (true) {
+            update_button_list(buttons1ex);
+            if (btn16.justPressed()) { // Carga e Descarga
+              if (Alert(0, W, "ATENCAO", "Confirmar Operacao", 0) == true) {
+                SerialBT.print("SCT03 6");
+                if (connected == true) {
+                  if (Alert(3, W, "PORTA DO CARONA", "Abra a Porta Carona", Flag_Carona) == true)  {
+                    if (Alert(2, W, "PORTA ABERTA", "Porta Carona Aberta", 0) == true) {
+                      if (Alert(1, W, "DESTRAVAR BAU", " Aperte Ok", 0) == true) {
+                        if (Alert(0, W, "DESTRAVAR BAU", "Confirmar Operação", 0) == true) {
+                          SerialBT.print("SSH091");
+                          Flag_Parada = 1;
+                        }
+                        else {
+                          ReturnMenu(menu_active);
+                          break;
+                        }
+                      }
+                    }
+                  } else {
+                    ReturnMenu(menu_active);
+                    break;
+                  }
+                } else {
+                  FailCommand();
+                  break;
+                }
+              } else {
+                ReturnMenu(menu_active);
+                break;
+              }
+            }
+            if (btn17.justPressed()) { // Banheiro
+              bool confirma = Alert(0, W, "ATENCAO", "Confirmar Parada ?", 0);
+              tft.fillScreen(BLACK);
+              if (confirma == true) {
+                if (connected == true) {
+                  SerialBT.print("SCT03 4");
+                  Alert(1, S, "SUCESSO" , "Parada Realizada", 0);
+                  Flag_Parada = 1;
+                  Beep(100); delay(200); Beep(100);
+                  tft.fillScreen(BLACK);
+                  menu1(false);
+                } else {
+                  FailCommand();
+                  break;
+                }
+              } else {
+                ReturnMenu(menu_active);
+                break;
+              }
+            }
+            if (btn18.justPressed()) { // Combustivel
+              bool confirma = Alert(0, W, "ATENCAO", "Confirmar Parada ?", 0);
+              tft.fillScreen(BLACK);
+              if (confirma == true) {
+                SerialBT.print("SCT03 10");
+                if (connected == true) {
+                  Alert(1, S, "SUCESSO" , "Parada Realizada", 0);
+                  Flag_Parada = 1;
+                  Beep(100); delay(200); Beep(100);
+                  tft.fillScreen(BLACK);
+                  menu1(false);
+                } else {
+                  FailCommand();
+                  break;
+                }
+              } else {
+                ReturnMenu(menu_active);
+                break;
+              }
+            }
+            if (btn19.justPressed()) { // Malote
+              if (Alert(0, W, "ATENCAO", "Confirmar Operacao", 0) == true) {
+                SerialBT.print("SCT03 8");
+                if (connected == true) {
+                  if (Alert(3, W, "PORTA DO CARONA", "Abra a Porta Carona", Flag_Carona) == true)  {
+                    if (Alert(2, W, "PORTA ABERTA", "Porta Carona Aberta", 0) == true) {
+                      if (Alert(1, W, "DESTRAVAR BAU", " Aperte Ok", 0) == true) {
+                        if (Alert(0, W, "DESTRAVAR BAU", "Confirmar Operação", 0) == true) {
+                          SerialBT.print("SSH091");
+                          Flag_Parada = 1;
+                          Beep(100); delay(200); Beep(100);
+                          ReturnMenu(menu_active);
+                          break;
+                        }
+                        else {
+                          ReturnMenu(menu_active);
+                          break;
+                        }
+                      }
+                    }
+                  } else {
+                    ReturnMenu(menu_active);
+                    break;
+                  }
+                } else {
+                  FailCommand();
+                  break;
+                }
+              } else {
+                ReturnMenu(menu_active);
+                break;
+              }
+            }
+            if (btnprincipal.justPressed()) {
+
+              tft.fillScreen(BLACK);
+              break;
+            }
+            if (btnvoltar.justPressed()) {
+
+              tft.fillScreen(BLACK);
+              menu1(false);
+              break;
+            }
+          }
+        }
+      }
+      if (item == 2) {
+        update_button_list(buttons2);
+        if (btn20.justPressed()) {
+          if (Alert(0, D, "ATENCAO", "Confirmar Emergencia", 0) == true) {
+            SerialBT.print("SCT04 1");
+            if (connected == true) {
+              Beep(100); delay(200); Beep(100);
+              ReturnMenu(menu_active);
+            } else {
+              FailCommand();
+            }
+          } else {
+            ReturnMenu(menu_active);
+          }
+        }
+        if (btn21.justPressed()) {
+          if (Alert(0, D, "ATENCAO", "Confirmar Emergencia", 0) == true) {
+            SerialBT.print("SCT04 2");
+            if (connected == true) {
+              Beep(100); delay(200); Beep(100);
+              ReturnMenu(menu_active);
+            } else {
+              FailCommand();
+            }
+          } else {
+            ReturnMenu(menu_active);
+          }
+        }
+        if (btn22.justPressed()) {
+          if (Alert(0, D, "ATENCAO", "Confirmar Emergencia", 0) == true) {
+            SerialBT.print("SCT04 3");
+            if (connected == true) {
+              Beep(100); delay(200); Beep(100);
+              ReturnMenu(menu_active);
+            } else {
+              FailCommand();
+            }
+          } else {
+            ReturnMenu(menu_active);
+          }
+        }
+        if (btn23.justPressed()) {
+          SerialBT.print(KeyboardNum("Digite o Tel", 11, "STP07"));
+          if (Alert(0, D, "ATENCAO", "Confirmar Emergencia", 0) == true) {
+            SerialBT.print("SCT04 5");
+            if (connected == true) {
+              Beep(100); delay(200); Beep(100);
+              ReturnMenu(menu_active);
+            } else {
+              FailCommand();
+            }
+          } else {
+            ReturnMenu(menu_active);
+          }
+        }
+        if (btn24.justPressed()) {
           tft.fillScreen(BLACK);
-          menu1(false);
-          break;
+          item = 3;
+          menu_active = menu3();
         }
+      }
+      if (item == 3) {
+        update_button_list(buttons3);
+        if (btn25.justPressed()) {
+          if (Alert(0, D, "ATENCAO", "Confirmar Emergencia", 0) == true) {
+            SerialBT.print("SCT08 0");
+            if (connected == true) {
+              SerialBT.print("SSH031");
+              if (connected == true) {
+                SerialBT.print("QCT08");
+                if (connected == true) {
+                  Alert(1, W, "CONTRA SENHA", "Em Breve", 0);
+                  SerialBT.print(KeyboardNum("Contra Senha", 11, "SCT09"));
+                  SerialBT.print("SSH041");
+                  if (connected == true) {
+                    SerialBT.print("SCC09 3");
+                    if (connected == true) {
+                      delay(5000);
+                      if (Flag_ContraSenha ==  1) { // Senha Correta
+                        SerialBT.print("SSXP11");
+                        if (connected == true) {
+                          SerialBT.print("SSH051");
+                          Beep(100); delay(200); Beep(100);
+                        } else {
+                          FailCommand();
+                        }
+                        ReturnMenu(menu_active);
+                      } else { // Senha Incorreta
+                        Alert(1, W, "CONTRA SENHA", "Senha Incorreta", 0);
+                        ReturnMenu(menu_active);
+                      }
 
+                    } else {
+                      FailCommand();
+                    }
+                  } else {
+                    FailCommand();
+                  }
+                } else {
+                  FailCommand();
+                }
+              } else {
+                FailCommand();
+              }
+            } else {
+              FailCommand();
+            }
+          } else {
+            ReturnMenu(menu_active);
+          }
+        }
+        if (btn26.justPressed()) {
+          if (Alert(0, D, "ATENCAO", "Confirmar Emergencia", 0) == true) {
+            SerialBT.print("SCT08 0");
+            SerialBT.print("SSH031");
+            SerialBT.print("QCT08");
+            Alert(1, W, "CONTRA SENHA", "Em Breve", 0);
+            SerialBT.print(KeyboardNum("Contra Senha", 11, "SCT09"));
+            SerialBT.print("SSH041");
+            SerialBT.print("SCC09 3");
+            if (Flag_ContraSenha ==  1) { // Senha Correta
+              SerialBT.print("SSH190");
+              SerialBT.print("SSH051");
+            } else if (Flag_ContraSenha == 2) { // Senha Incorreta
+              Alert(1, W, "CONTRA SENHA", "Senha Incorreta", 0);
+              ReturnMenu(menu_active);
+            }
+          } else {
+            ReturnMenu(menu_active);
+          }
+        }
       }
     }
-  }
-  if (item == 2) {
-    update_button_list(buttons2);
-    if (btn20.justPressed()) {
-
-      delay(50);
+    if (Flag_OperacaoBloqueada == 1) {
+      update_button_list(buttons2);
     }
-    if (btn21.justPressed()) {
-
-      delay(50);
-    }
-    if (btn22.justPressed()) {
-
-      delay(50);
-    }
-    if (btn23.justPressed()) {
-
-      delay(50);
-    }
-    if (btn24.justPressed()) {
-
-      delay(50);
-      tft.fillScreen(BLACK);
-      item = 3;
-      menu3();
-    }
-  }
-  if (item == 3) {
-    update_button_list(buttons3);
   }
 }
-
-// Função Verificação Pressão

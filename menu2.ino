@@ -1,4 +1,4 @@
-void menu2() {
+char* menu2() {
   MenuName(BLUE_MENU, WHITE, "Menu Emergencia"); // Nome Dos Menus (Cor de Fundo / Cor do Texto / Texto);
   btn20.initButton(&tft,  120, 62, 260, 40, WHITE, WHITE, BLACK, "Perseguicao", 2);
   btn21.initButton(&tft,  120, 108, 260, 40, WHITE, WHITE, BLACK, "Carga Exposta", 2);
@@ -10,4 +10,5 @@ void menu2() {
   btn22.drawButton(false);
   btn23.drawButton(false);
   btn24.drawButton(false);
+   return "menu2";
 }

@@ -1,4 +1,4 @@
-void menu(bool opcao) {
+char* menu(bool opcao) {
   MenuName(BLUE_MENU, WHITE, "Menu Principal"); // Nome Dos Menus (Cor de Fundo / Cor do Texto / Texto);
   if (opcao == false) {
 
@@ -24,4 +24,5 @@ void menu(bool opcao) {
     btn8.drawButton(false);
     btn9.drawButton(false);
   }
+   return "menu";
 }

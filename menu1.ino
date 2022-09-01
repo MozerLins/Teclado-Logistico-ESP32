@@ -1,4 +1,4 @@
-void menu1(bool opcao) {
+char* menu1(bool opcao) {
   MenuName(BLUE_MENU, WHITE, "Motivo Parada"); // Nome Dos Menus (Cor de Fundo / Cor do Texto / Texto)
   if (opcao == false) {
     btn10.initButton(&tft,  120, 62, 260, 40, WHITE, WHITE, BLACK, "Cliente", 2);
@@ -25,5 +25,5 @@ void menu1(bool opcao) {
     btn18.drawButton(false);
     btn19.drawButton(false);
   }
-
+  return "menu1";
 }

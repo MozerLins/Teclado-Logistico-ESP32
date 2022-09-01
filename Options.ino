@@ -21,7 +21,7 @@ int Options(uint16_t tipo, char* titulo ,  char* mensagem) {
   tft.setTextColor(BLACK);
   tft.setCursor(5 + (230 / 2) - (strlen(mensagem) * 3 * 2), 140);
   tft.write(mensagem);
-  
+
   btn_option1.initButton(&tft,  62, 210, 92, 40, tipo, WHITE, BLACK, "Opcao 1", 2);
   btn_option2.initButton(&tft,  177, 210, 92, 40, tipo, WHITE, BLACK, "Opcao 2", 2);
   btn_option1.drawButton(false);
@@ -29,6 +29,9 @@ int Options(uint16_t tipo, char* titulo ,  char* mensagem) {
 
   while (true) {
     update_button_list(options);
+    if (Flag_Pause == 1) {
+      break;
+    }
 
     if (btn_option1.justPressed()) {
       Beep(5);
