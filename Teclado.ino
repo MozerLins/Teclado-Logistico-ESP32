@@ -1,4 +1,5 @@
-//#include <Adafruit_GFX.h>            // Core graphics library (Não Utilizado)
+#include <freertos/FreeRTOS.h>
+#include <freertos/message_buffer.h>
 #include <BluetoothSerial.h>          // Biblioteca para o Bluetooh
 #include <MCUFRIEND_kbv.h>
 MCUFRIEND_kbv tft;
@@ -32,6 +33,19 @@ int Flag_AreaMalote = 0;
 int Flag_Pause = 0;
 //int Flag_While = 0;
 //int Flag_15 = 0;
+//------------------------------BUFFER DE MENSAGEM------------------------------//
+//ESTATICO//
+/* Usado para dimensionar o array usado para armazenar as mensagens. O espaço disponível
+será na verdade um a menos que isso, então 999. */
+#define STORAGE_SIZE_BYTES 1000 
+/* Define a memória que irá conter as mensagens dentro da mensagem
+amortecedor. Deve ser um a mais que o valor passado no xBufferSizeBytes
+parâmetro. */
+static uint8_t ucStorageBuffer[ STORAGE_SIZE_BYTES ];
+
+/* A variável usada para manter a estrutura do buffer de mensagem. */
+StaticMessageBuffer_t xMessageBufferStruct;
+
 
 //------------------------------Tarefeas do Sitesma----------------------------//
 TaskHandle_t xHandle;
@@ -187,7 +201,7 @@ void FailCommand() {
 void setup(void) {
   Serial.begin(115200);
   xTaskCreate(Connect, "Connect", 2048, NULL, 0, &HandleConnect);
-
+//  BufferMensage();
   idDisplay(); //IDDisplay
 
   //-------------------Orientação da Tela--------------------//
@@ -268,10 +282,10 @@ void loop() {
             } else {
               FailCommand();
             }
-          } else if (Flag_Ignicao == 0) {
-            Alert(1, D, "IGNICAO" , "DESLIGADA", 0);
-            ReturnMenu(menu_active);
-          }
+          } //else if (Flag_Ignicao == 0) {
+           // Alert(1, D, "IGNICAO" , "DESLIGADA", 0);
+            //ReturnMenu(menu_active);
+          //}
         }
 
         if (btn2.justPressed()) {
@@ -585,7 +599,7 @@ void loop() {
               tft.fillScreen(BLACK);
               if (confirma == true) {
                 if (connected == true) {
-                  SerialBT.print("SCT03 4");
+                  SerialBT.print("SCT03 9");
                   Alert(1, S, "SUCESSO" , "Parada Realizada", 0);
                   Flag_Parada = 1;
                   Beep(100); delay(200); Beep(100);
