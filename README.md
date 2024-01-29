@@ -25,11 +25,26 @@ A utilização deste módulo de interface proporcionou uma experiência de usuá
 ![image](https://github.com/MozerLins/TTL-001/assets/94911429/ff063dc5-7700-47e8-b22e-b1a67ec9f217)
 ![image](https://github.com/MozerLins/TTL-001/assets/94911429/96ed0336-3dcd-47f4-be98-c3781dfbd216)
 
-## Integração com Linhas de Rastreadores VIRLOC-6
-A integração deste teclado terminal de dados foi direcionada especificamente para as linhas de rastreadores do tipo VIRLOC-6. Inicialmente, a ideia era integrar via Bluetooth, porém, devido às especificidades do projeto e às características técnicas dos dispositivos, a integração foi focada nesse tipo específico de rastreador.
+No entanto, é importante notar que mesmo com essa compatibilidade, foram necessárias ligações externas devido aos pinos analógicos IO35, 34 e 36 serem apenas pinos de entrada. Para resolver esse problema, foram feitas três ligações com fios na parte inferior da placa, conectando-os aos pinos de reposição IO15, 33 e 22, conforme representado na Figura 8.
+
+![image](https://github.com/MozerLins/TTL-001/assets/94911429/4efb9834-86b2-4d15-9f39-e16f4a13fb1c)
+
+Essas ligações adicionais foram essenciais para garantir o funcionamento adequado do módulo de interface com a placa de desenvolvimento, permitindo uma integração completa e eficaz do sistema.
+
+### Modelagem 3D
+Para a criação do modelo 3D, foi utilizado o ambiente web do Tinkercad. O Tinkercad oferece uma ampla variedade de ferramentas para criação de modelos 3D, tornando o processo acessível mesmo para aqueles sem uma experiência extensa em modelagem 3D. Além disso, o Tinkercad conta com uma biblioteca extensa de protótipos 3D compartilhados por outros usuários, que podem servir como referência para nossos próprios modelos.
+
+![image](https://github.com/MozerLins/TTL-001/assets/94911429/3260c265-7161-4364-8856-14654bef75ff)
+
+A escolha do Tinkercad permitiu uma modelagem eficiente e precisa do Teclado Logístico, garantindo que o design atendesse às especificações e requisitos do projeto.
+
+
+
+## Integração com Linhas de Rastreadores VIRLOC-8
+A integração deste teclado terminal de dados foi direcionada especificamente para as linhas de rastreadores do tipo VIRLOC-8. Inicialmente, a ideia era integrar via Bluetooth, porém, devido às especificidades do projeto e às características técnicas dos dispositivos, a integração foi focada nesse tipo específico de rastreador.
 
 ### Integração com Outras Tecnologias
-Encorajamos os usuários a explorar e integrar este teclado terminal de dados com outras tecnologias e dispositivos além dos rastreadores VIRLOC-6. Embora o projeto tenha sido inicialmente direcionado para essa integração específica, ele foi projetado de forma modular e flexível para facilitar a integração com uma variedade de sistemas.
+Encorajamos os usuários a explorar e integrar este teclado terminal de dados com outras tecnologias e dispositivos além dos rastreadores VIRLOC-8. Embora o projeto tenha sido inicialmente direcionado para essa integração específica, ele foi projetado de forma modular e flexível para facilitar a integração com uma variedade de sistemas.
 Se você deseja integrar este teclado com sua própria tecnologia ou adaptá-lo para funcionar com outros dispositivos, sinta-se à vontade para fazê-lo! Estamos abertos a colaborações e novas ideias para expandir a funcionalidade deste projeto.
 
 ## Clone este repositório em sua máquina local.
@@ -39,3 +54,11 @@ Siga as instruções no terminal para concluir a instalação.
 
 ## Contribuição de Usuários
 Se você deseja contribuir com este projeto, você pode criar sua própria branch e enviar suas alterações através de um Pull Request. 
+
+# Observação
+Por favor, note que a criação deste projeto foi realizada durante meu período como junior. Estou constantemente aprendendo e aprimorando minhas habilidades, então algumas decisões de design ou implementações podem refletir meu nível de experiência na época. No entanto, estou comprometido em fornecer um código de qualidade e estou aberto a feedback e sugestões para melhorias contínuas.
+
+* Resultado Final:
+
+![image](https://github.com/MozerLins/TTL-001/assets/94911429/7ec94222-7058-49b6-abd6-c5bb6a1dda58)
+
